@@ -1,0 +1,62 @@
+{
+    "manifest_version":  "0.4",
+    "name":  "etabs-mcp",
+    "display_name":  "ETABS MCP Server",
+    "version":  "1.0.0",
+    "description":  "MCP server for CSI ETABS via the ETABS COM API",
+    "long_description":  "The ETABS MCP server enables Claude to interact with your ETABS models and perform tasks like geometry creation, load definition, analysis execution, result extraction, and frame design.\n\n## Key Features\n- **Full API coverage**: Joints, frames, areas, loads, analysis, results, and design via the ETABS COM API.\n- **AI-friendly**: Built-in skills provide guidance on the ETABS API for geometry, loading, analysis, results, and design.\n- **Sandboxed execution**: Code runs in a restricted Python sandbox Ã¢â‚¬â€ no arbitrary imports, no filesystem access.\n- **Privacy-first**: All processing happens locally. No data is sent to the cloud.\n\nRequires CSI ETABS 21 or later installed and running with a model open.",
+    "author":  {
+                   "name":  "etabs-mcp contributors"
+               },
+    "server":  {
+                   "type":  "binary",
+                   "entry_point":  "etabs-mcp.exe",
+                   "mcp_config":  {
+                                      "command":  "${__dirname}/etabs-mcp.exe",
+                                      "args":  [
+
+                                               ]
+                                  }
+               },
+    "tools":  [
+                  {
+                      "name":  "discover_api",
+                      "description":  "Discover available API guidance and skills. Call this first before using other etabs-mcp tools."
+                  },
+                  {
+                      "name":  "read_skills",
+                      "description":  "Read one or more skills by name. Each skill provides domain-specific guidance (geometry, loads, analysis, results, design)."
+                  },
+                  {
+                      "name":  "list_instances",
+                      "description":  "List all running ETABS instances with alias, PID, file path, and version."
+                  },
+                  {
+                      "name":  "get_status",
+                      "description":  "Check the connection to ETABS. Returns connection state, version, model path, and lock status."
+                  },
+                  {
+                      "name":  "execute_code",
+                      "description":  "Execute Python code in a sandbox against the ETABS COM API. The pre-connected \u0027model\u0027 variable is SapModel. Last expression or explicit \u0027result = ...\u0027 is returned."
+                  }
+              ],
+    "tools_generated":  false,
+    "keywords":  [
+                     "etabs",
+                     "structural",
+                     "engineering",
+                     "csi",
+                     "building",
+                     "com"
+                 ],
+    "license":  "MIT",
+    "compatibility":  {
+                          "claude_desktop":  "\u003e=0.10.0",
+                          "platforms":  [
+                                            "win32"
+                                        ],
+                          "runtimes":  {
+
+                                       }
+                      }
+}

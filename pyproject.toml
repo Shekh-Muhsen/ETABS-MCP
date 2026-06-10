@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "etabs-mcp"
+version = "1.0.0"
+description = "MCP server for CSI ETABS via the ETABS COM API"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    { name = "etabs-mcp contributors" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: Microsoft :: Windows",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    "fastmcp>=3.2.3,<4",
+    "packaging>=24",
+    "starlette>=1.0.0,<2.0.0",
+    "pydantic>=2,<3",
+    "pywin32>=311; platform_system == 'Windows'",
+    "comtypes>=1.4; platform_system == 'Windows'",
+    "openpyxl>=3.1,<4",
+    "defusedxml>=0.7",
+    "chardet>=5,<8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.11",
+]
+
+[project.scripts]
+etabs-mcp = "etabs_mcp.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/etabs_mcp"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = ["src/etabs_mcp/etabs_skills", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501", "RUF200"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["etabs_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: requires running ETABS instance (Windows only)",
+]
