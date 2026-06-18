@@ -193,8 +193,8 @@ short_name = model.GetModelFilename(False)
 # Save current model in-place
 ret = model.File.Save()
 
-# Save to a new path (absolute .edb path required)
-ret = model.File.SaveAs("C:\\Projects\\building_v2.edb")
+# Save to a new path — use File.Save(path), NOT SaveAs (SaveAs does not exist)
+ret = model.File.Save("C:\\Projects\\building_v2.edb")
 
 # Open an existing file (model must be unlocked first)
 ret = model.File.OpenFile("C:\\Projects\\building.edb")
@@ -246,9 +246,9 @@ Quick index cheat-sheet for the most-used Results calls:
 | `ModalPeriod()` | [1]=Case [3]=StepNum [4]=Period [5]=Freq [6]=CircFreq |
 | `ModalParticipatingMassRatios()` | [3]=StepNum [4]=Period [5]=UX [6]=UY [8]=SumUX [9]=SumUY |
 | `StoryDrifts()` | [1]=Story [2]=Case [5]=Direction [6]=Drift |
-| `JointDispl(name,0)` | [1]=ObjName [3]=Case [6]=U1 [7]=U2 [8]=U3 |
-| `FrameForce(name,0)` | [1]=ObjName [4]=Case [7]=P [8]=V2 [9]=V3 [10]=T [11]=M2 [12]=M3 |
-| `PierForce()` | [1]=Story [2]=Pier [3]=Case [6]=Location [7]=P [8]=V2 [9]=V3 [10]=T |
+| `JointDispl(name,0)` | [1]=ObjName [3]=Case [6]=U1 [7]=U2 [8]=U3(vertical) |
+| `FrameForce(name,0)` | **15-element tuple** — [1]=ObjName [5]=Case [8]=P [9]=V2 [10]=V3 [11]=T [12]=M2 [13]=M3 |
+| `PierForce()` | [1]=Story [2]=Pier [3]=Case [6]=Location [7]=P [8]=V2 [9]=V3 [10]=T (no M2/M3) |
 
 ---
 
@@ -262,10 +262,15 @@ Quick index cheat-sheet for the most-used Results calls:
 
 ```python
 # GetAvailableTables() → [n, (names_tuple), ret]
+# Returns 54 tables on a blank model, ~127 on an analyzed model
 t = model.DatabaseTables.GetAvailableTables()
 n = t[0]
 names = list(t[1]) if n > 0 else []
 result = names
+
+# GetAllTables() → ~1007 tables (includes all possible, not just available)
+t2 = model.DatabaseTables.GetAllTables()
+all_names = list(t2[1]) if t2[0] > 0 else []
 ```
 
 ### Read a Table
@@ -347,6 +352,37 @@ result = {
     "load_cases": list(lc_tuple[1]) if lc_tuple[0] > 0 else [],
 }
 ```
+
+---
+
+## Delete All Elements (Clean Model)
+
+To wipe all geometry from an open model, call `SelectObj.All()` then delete each object type separately. **Do not chain all three deletes in one expression** — call each on its own line or the sandbox may raise `AttributeError: Delete` mid-sequence.
+
+- `FrameObj.Delete("", 2)` — deletes all selected frame elements (ItemType 2 = SelectedObjects)
+- `AreaObj.Delete("", 2)` — deletes all selected area/shell elements
+- `PointObj.DeleteSpecialPoint("", 2)` — removes any remaining manually-added joints; regular joints tied to elements are removed automatically with their elements
+- `PointObj.Delete` does **not** exist — use `DeleteSpecialPoint` for standalone joints
+
+```python
+model.SelectObj.All()
+
+ret_f = model.FrameObj.Delete("", 2)          # 0 = success
+ret_a = model.AreaObj.Delete("", 2)           # 0 = success
+ret_p = model.PointObj.DeleteSpecialPoint("", 2)  # 0 = success
+
+n_f = model.FrameObj.Count()
+n_a = model.AreaObj.Count()
+n_p = model.PointObj.Count()
+
+result = {
+    "ret_frames": ret_f, "ret_areas": ret_a, "ret_points": ret_p,
+    "remaining_frames": n_f, "remaining_areas": n_a, "remaining_points": n_p,
+}
+# All counts should be 0 if model was fully cleared
+```
+
+> **Alternative:** `model.File.NewBlank()` resets the entire model (geometry + properties + load cases) to a blank state. Use only if you want to discard everything including material/section definitions and story data.
 
 ---
 

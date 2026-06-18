@@ -1,11 +1,14 @@
 ---
 name: etabs-loads
-description: "Use when defining load patterns, load cases (static, modal, response spectrum), load combinations, and applying loads to joints, frames, and areas. Covers joint forces, frame distributed/point loads, area uniform loads, self-weight, and temperature loads."
+description: "Use when defining load patterns, load cases (static, modal, response spectrum), load combinations, and applying loads to joints, frames, and areas. Covers joint forces, frame distributed/point loads, area uniform loads, self-weight, and temperature loads. ⚠️ For AUTO SEISMIC (ASCE 7-05/IBC, BNBC) or AUTO WIND patterns, use skill 'etabs-auto-seismic' instead — COM SetXXX methods are broken, DatabaseTables is the only working method."
 ---
 
 # ETABS Loads
 
 Read `etabs-core` first for sandbox rules and return value conventions.
+
+> **Auto seismic / auto wind patterns** → use skill **`etabs-auto-seismic`**.
+> COM methods (`AutoSeismic.SetIBC2006`, etc.) are broken. DatabaseTables only.
 
 ---
 
@@ -137,6 +140,15 @@ ret = model.LoadCases.Modal.SetCase("Modal")
 ret = model.LoadCases.ModalEigen.SetNumberModes("Modal", 12, 1)
 ```
 
+### Create RS Spectrum Function (via DatabaseTables — only working method)
+
+```python
+# model.Func.AddRS_User(...) does NOT exist — AttributeError
+# The only way to create RS functions is via DatabaseTables.SetTableForEditingArray
+# See etabs-database-tables skill for the complete RS function creation workflow
+# See bnbc2020-seismic-params skill for BNBC 2020 specific implementation
+```
+
 ### Response Spectrum Case
 
 ```python
@@ -144,40 +156,41 @@ ret = model.LoadCases.ModalEigen.SetNumberModes("Modal", 12, 1)
 ret = model.LoadCases.ResponseSpectrum.SetCase("RSX")
 ret = model.LoadCases.ResponseSpectrum.SetCase("RSY")
 
-# ResponseSpectrum.SetLoads(Name, n, LoadName[], Func[], SF[], Ang[], CSys[]) → ret
+# ResponseSpectrum.SetLoads(Name, n, LoadName[], Func[], SF[], CSys[], Ang[]) → ret
+# VERIFIED order: CSys comes BEFORE Ang (opposite of what old docs showed)
 # LoadName: direction ("U1", "U2", "U3")
 # Func: spectrum function name
 # SF: scale factor (typically g = 9.81 for kN_m)
-# Ang: angle of loading
-# CSys: coordinate system
+# CSys: coordinate system string e.g. "Global"
+# Ang: angle of loading (float, e.g. 0.0)
 
 ret = model.LoadCases.ResponseSpectrum.SetLoads(
     "RSX", 1,
     ["U1"],          # X direction
     ["RS_Func"],     # spectrum function name
     [9.81],          # scale factor = g
-    [0.0],           # angle
-    ["Global"],      # coordinate system
+    ["Global"],      # coordinate system — CSys BEFORE Angle
+    [0.0],           # angle (degrees)
 )
 ret = model.LoadCases.ResponseSpectrum.SetLoads(
     "RSY", 1,
     ["U2"],
     ["RS_Func"],
     [9.81],
-    [0.0],
     ["Global"],
+    [0.0],
 )
 
 # Get RS loads
 # ResponseSpectrum.GetLoads(Name) → [n, LoadNames_t, Funcs_t, SFs_t, CSys_t, Angles_t, ret]
-# Note: CSys is at index [4], Angles at index [5] (order differs from SetLoads)
+# VERIFIED: CSys at [4] (string e.g. "Global"), Angles at [5] (float)
 t = model.LoadCases.ResponseSpectrum.GetLoads("RSX")
 n = t[0]
 load_names = list(t[1])
 funcs = list(t[2])
 sfs = list(t[3])
-csys_list = list(t[4])    # CSys strings
-angles = list(t[5])       # angles
+csys_list = list(t[4])    # CSys strings e.g. ["Global"]
+angles = list(t[5])       # angles e.g. [0.0]
 ```
 
 ### Seismic 85% Scaling — Modify RS Scale Factor
@@ -212,8 +225,12 @@ ret = model.SetModelIsLocked(False)
 rs_x = model.LoadCases.ResponseSpectrum.GetLoads("Spec X")
 n_x = rs_x[0]
 new_SFs = [rs_x[3][i] * Sx for i in range(n_x)]
+# GetLoads returns: [n, LoadNames, Funcs, SFs, CSys, Angles, ret]
+# SetLoads order: (Name, N, LoadNames[], Funcs[], SFs[], CSys[], Angles[])
+# CSys at position 5, Angles at position 6 — VERIFIED
 model.LoadCases.ResponseSpectrum.SetLoads(
     "Spec X", n_x, list(rs_x[1]), list(rs_x[2]), new_SFs, list(rs_x[4]), list(rs_x[5]))
+# rs_x[4] = CSys (e.g. "Global"), rs_x[5] = Angles (e.g. 0.0) — order is correct
 
 rs_y = model.LoadCases.ResponseSpectrum.GetLoads("Spec Y")
 n_y = rs_y[0]
@@ -229,16 +246,17 @@ result = {"Sx": Sx, "Sy": Sy, "rerun_success": ret == 0}
 ### Enable / Disable Cases for Analysis
 
 ```python
+# SetRunCaseFlag lives on model.Analyze — NOT model.LoadCases
+# model.LoadCases.SetRunCaseFlag does NOT exist
 # SetRunCaseFlag(Name, Run, applyAll=False) → ret
-# Deselect all cases first
-ret = model.LoadCases.SetRunCaseFlag("", False, True)   # applyAll=True clears all
+ret = model.Analyze.SetRunCaseFlag("", False, True)   # applyAll=True clears all
 
 # Select specific cases to run
-ret = model.LoadCases.SetRunCaseFlag("Dead", True)
-ret = model.LoadCases.SetRunCaseFlag("SDL", True)
-ret = model.LoadCases.SetRunCaseFlag("LL", True)
-ret = model.LoadCases.SetRunCaseFlag("Modal", True)
-ret = model.LoadCases.SetRunCaseFlag("RSX", True)
+ret = model.Analyze.SetRunCaseFlag("Dead", True)
+ret = model.Analyze.SetRunCaseFlag("SDL", True)
+ret = model.Analyze.SetRunCaseFlag("LL", True)
+ret = model.Analyze.SetRunCaseFlag("Modal", True)
+ret = model.Analyze.SetRunCaseFlag("RSX", True)
 ```
 
 ---

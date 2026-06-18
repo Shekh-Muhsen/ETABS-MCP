@@ -71,13 +71,16 @@ result = joints
 ### Restraints (Boundary Conditions)
 
 ```python
-# SetRestraint(Name, Value[6], ItemType=0)
+# SetRestraint(Name, Value[6], ItemType=0) → returns tuple [(restraint_vals), ret]
+# NOT a scalar int — unpack carefully
 # Value = [U1, U2, U3, R1, R2, R3] — True=fixed, False=free
+
 # Fixed base (pin)
-ret = model.PointObj.SetRestraint("1", [True, True, True, False, False, False])
+result_t = model.PointObj.SetRestraint("1", [True, True, True, False, False, False])
+# result_t[0] = (vals tuple), result_t[1] = ret code
 
 # Fixed base (fully fixed)
-ret = model.PointObj.SetRestraint("1", [True, True, True, True, True, True])
+result_t = model.PointObj.SetRestraint("1", [True, True, True, True, True, True])
 
 # GetRestraint(Name) → [(F1,F2,F3,M1,M2,M3), ret]
 # The 6 boolean values come back as a single tuple at index [0]
@@ -193,7 +196,7 @@ Area elements represent slabs, walls, and shells.
 
 ```python
 # AddByCoord(NumberPoints, x[], y[], z[], PropName="Default", UserName="", CSys="Global")
-# Returns: [name_assigned, ret]
+# Returns: [name_assigned, ret]  (for AddByCoord name IS at [0])
 x_list = [0.0, 5.0, 5.0, 0.0]
 y_list = [0.0, 0.0, 5.0, 5.0]
 z_list = [3.0, 3.0, 3.0, 3.0]
@@ -204,10 +207,16 @@ area_name = t[0]
 ### Add an Area by Joint Names
 
 ```python
-# AddByPoint(NumberPoints, points[], PropName, UserName)
-# Returns: [name_assigned, ret]
+# AddByPoint(NumberPoints, points[], PropName="Default", UserName="")
+# Returns: [(joint_names_tuple), area_element_name, ret]
+# VERIFIED: area name is at [1] NOT [0] — [0] is the input joint names tuple
 t = model.AreaObj.AddByPoint(4, ["1", "2", "3", "4"], "Wall200")
-area_name = t[0]
+area_name = t[1]   # ← [1] not [0]
+ret = t[2]
+
+# Also works with 3-node triangular areas:
+t2 = model.AreaObj.AddByPoint(3, ["1", "2", "3"], "Wall200")
+tri_name = t2[1]
 ```
 
 ### Count and List Areas
@@ -348,6 +357,117 @@ types = list(t[1])
 names = list(t[2])
 result = [{"type": types[i], "name": names[i]} for i in range(n)]
 ```
+
+---
+
+## CHS / Pipe Section (`model.PropFrame.SetPipe`)
+
+Use `SetPipe` for circular hollow sections (CHS / tube / pipe):
+
+```python
+# SetPipe(Name, MatProp, Diameter, WallThickness)  — all in current units (m)
+ret = model.PropFrame.SetPipe("Tube150x3", "S355", 0.15, 0.003)
+# OD = 0.15 m (150 mm), wall = 0.003 m (3 mm)
+```
+
+For rectangular hollow sections use `SetTube(Name, MatProp, Height, Width, Tf, Tw)`.
+
+---
+
+## Adjust Story Height (`model.Story.SetHeight`)
+
+```python
+# SetHeight(StoryName, Height) — height in current units
+ret = model.Story.SetHeight("Story1", 5.0)   # set Story1 to 5 m
+
+# Verify
+t = model.Story.GetStories()
+story_names   = list(t[1])
+story_heights = list(t[2])
+for i in range(t[0]):
+    et = model.Story.GetElevation(story_names[i])
+    print(story_names[i], "h=", story_heights[i], "elev=", et[0])
+```
+
+---
+
+## Truss from External Node/Member Data
+
+When node and member data come from an external source (JSON, CSV, another program), map coordinates explicitly to ETABS axes before adding geometry.
+
+### Coordinate Mapping Convention
+
+External data often uses a different axis convention.  
+For a **bow truss in the X-Z plane** where the external data has:
+- `x` = 0 (all in one plane, ignore)
+- `y` = rise direction (height)
+- `z` = span direction
+
+Map to ETABS as:
+
+```
+ETABS_x = z_external + x_offset   # span → ETABS X
+ETABS_y = 0                        # keep truss in Y=0 plane
+ETABS_z = y_external + z_offset    # rise → ETABS Z (elevation)
+```
+
+`x_offset` shifts the left support to x=0.  
+`z_offset` = column height (e.g. 5.0 m) to elevate truss above columns.
+
+### Full Example — Truss from Dict
+
+```python
+model.SetModelIsLocked(False)
+model.SetPresentUnits(6)  # kN_m
+
+X_OFF = 5.0   # shift so left support lands at x=0 (if left node z=-5 in source)
+Z_OFF = 5.0   # column height — elevates truss above ground
+
+nodes_data = {
+    # "id": [x_src, y_src, z_src]  — x_src ignored (all in-plane)
+    "1": [0, 0.0, 0.0],     # left support (bottom chord)
+    "2": [0, 2.5, 11.5],    # crown (top chord, midspan)
+    "3": [0, 0.0, 23.0],    # right support (bottom chord)
+    # ... all nodes ...
+}
+
+node_map = {}   # source id → ETABS joint name
+for nid, c in nodes_data.items():
+    t = model.PointObj.AddCartesian(c[2] + X_OFF, 0.0, c[1] + Z_OFF)
+    node_map[nid] = t[0]
+
+members_data = {
+    # "id": [start_node_id, end_node_id]
+    "1": ["1", "2"],
+    # ...
+}
+
+for ends in members_data.values():
+    model.FrameObj.AddByPoint(node_map[ends[0]], node_map[ends[1]], "Tube150x3")
+```
+
+### Column + Truss Assembly
+
+After placing the truss, add RC columns below the support nodes:
+
+```python
+# x positions of the two support nodes
+x_left  = 0.0    # from coordinate mapping above
+x_right = 23.34  # from coordinate mapping above
+col_h   = 5.0    # column height (= Z_OFF)
+
+model.PropFrame.SetRectangle("Col400x400", "C25", 0.4, 0.4)
+model.FrameObj.AddByCoord(x_left,  0, 0, x_left,  0, col_h, "Col400x400")
+model.FrameObj.AddByCoord(x_right, 0, 0, x_right, 0, col_h, "Col400x400")
+
+# Fixed bases — AddCartesian returns existing node if one already exists at that point
+t_lb = model.PointObj.AddCartesian(x_left,  0, 0)
+t_rb = model.PointObj.AddCartesian(x_right, 0, 0)
+model.PointObj.SetRestraint(t_lb[0], [True, True, True, True, True, True])
+model.PointObj.SetRestraint(t_rb[0], [True, True, True, True, True, True])
+```
+
+> **Auto-pin at z=0:** ETABS automatically applies pin restraints to all nodes at z=0 (base level). This is useful for column bases but causes problems for trusses placed at ground level — always elevate the truss above z=0 using `Z_OFF = column_height`.
 
 ---
 
