@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+dist/
+build/
+*.egg-info/
+uv.lock
+
+# ETABS model files
+*.EDB
+*.edb
+*.$et
+*.K_0
+*.K_I
+*.K_J
+*.K_M
+*.LOG
+*.OUT
+*.Y
+*.Y$$
+*.Y00
+*.Y01
+*.Y02
+*.Y03
+*.Y04
+*.Y05
+*.Y_
+*.Y_1
+*.ebk
+*.ico
+*.msh
+
+# Build artifacts
+mcpb-staging/
+*.mcpb
+*.zip
+*.exe
+
+# Test / scratch
+test_model.*
+test_input.*
+test_results.json
+test_page.png
+FX-A_blank.*
+
+# CHM extraction scratch
+chm_extract/
+chm_extracted/
+extracted/
+ibc_pages/
+IBC_2012_markdown/
+chm_pages/
+
+# PDFs
+*.pdf
+
+# Embeddings
+*.npy
+
+# Typelib temp
+*_typelib_temp.json
+
+# Claude internal
+.claude/
+
+# IDE
+.vscode/
+.idea/
