@@ -1,6 +1,6 @@
 # ETABS MCP Server
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![ETABS](https://img.shields.io/badge/ETABS-21%2B-orange)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -63,6 +63,17 @@ Claude translates your request into ETABS COM API calls automatically — no scr
 | `workflow-modifiers` | Frame and area stiffness modifier review and assignment |
 | `etabs-database-tables` | Complete guide to all 165 database tables with field schemas |
 | `etabs-errors` | Troubleshooting guide — ret codes, locked model, COM issues |
+
+### New in v2.0 — Code Check Workflow Skills (from plugin source)
+
+| Skill | What it does |
+|-------|-------------|
+| `workflow-drift-check-bnbc` | Dual-method drift check: ETABS StoryDrifts + hand calc (δᵢ−δ_below)/h with Cd/I and BNBC 2020 / ASCE 7 occupancy-based limits |
+| `workflow-irregularity-check` | Soft story (stiffness K ratios), mass irregularity (>1.5×adjacent), CM-CR eccentricity per BNBC 2020 / ASCE 7-05 §12.3.2 |
+| `workflow-otm-check` | Overturning moment hand calc per BNBC 2020 — T, Sa, V, k, Fx per story, OTMx, foundation OTM = 0.75×OTM |
+| `workflow-story-forces` | Story shears and overturning moments from ETABS "Story Forces" table (Location=Bottom) + 0.75×M foundation reduction |
+| `workflow-mass-participation` | Modal mass participation ratios, 90% UX/UY target check, defined vs actual mode count comparison |
+| `workflow-torsion-check` | Torsional irregularity δ_max/δ_avg per story (edge joint pairs), Ax amplification factor, ASCE 7 Type 1a/1b classification |
 
 ### Safe Execution Sandbox
 - Code runs in a **restricted Python sandbox** — no arbitrary imports, no filesystem writes, no shell access

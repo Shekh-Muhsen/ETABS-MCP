@@ -1,6 +1,6 @@
 ---
 name: etabs-auto-seismic
-description: "Use when defining auto seismic or auto wind lateral load patterns in ETABS. Covers ASCE 7-05 ELF seismic (IBC 2006/2009/2012), BNBC 2020, and ASCE 7-05 wind. CRITICAL: All COM SetXXX methods (SetIBC2006, SetASCE705, etc.) are BROKEN — always use DatabaseTables. SiteClass must always be 'F' to preserve custom Fa/Fv."
+description: "Use when defining auto seismic or auto wind lateral load patterns in ETABS. Covers ASCE 7-05 ELF seismic (IBC 2006/2009/2012), BNBC 2020, and ASCE 7-05 wind. CRITICAL: All COM SetXXX methods are BROKEN — always use DatabaseTables. SiteClass must always be 'F' to preserve custom Fa/Fv. Never strip field list — always use ETABS-returned fields when writing back."
 ---
 
 # ETABS Auto Lateral Load Patterns
@@ -9,9 +9,9 @@ description: "Use when defining auto seismic or auto wind lateral load patterns 
 
 | Rule | Detail |
 |---|---|
-| **COM methods broken** | `AutoSeismic.SetIBC2006()`, `SetASCE705()`, etc. — argument types cannot be resolved. Always use DatabaseTables instead. |
-| **SiteClass = "F" always** | ETABS overwrites Fa/Fv for classes A–E with its own table. Only `"F"` preserves your custom values. |
-| **Table name** | `"Load Pattern Definitions - Auto Seismic - ASCE 7-05"` |
+| **COM methods broken** | `AutoSeismic.SetIBC2006()`, `SetASCE705()`, `SetASCE716()` — all broken. `SetASCE716` silently writes `TopStory=BotStory="Base"` → zero base shear. Always use DatabaseTables. |
+| **SiteClass = "F" always** | ETABS overwrites Fa/Fv for classes A–E with its own table. Only `"F"` preserves custom values. |
+| **Never strip fields** | Use the field list returned by `GetTableForDisplayArray` when writing back. Filtering to a subset strips data from existing rows and deletes/corrupts them. |
 | **Pattern must exist first** | Add the load pattern with `model.LoadPatterns.Add(name, 5, 0.0, True)` before writing the table row. |
 
 ---
@@ -20,14 +20,14 @@ description: "Use when defining auto seismic or auto wind lateral load patterns 
 
 | Table Name | Use For |
 |---|---|
-| `Load Pattern Definitions - Auto Seismic - ASCE 7-05` | ASCE 7-05 ELF seismic (IBC 2006 / IBC 2009 / IBC 2012) |
+| `Load Pattern Definitions - Auto Seismic - ASCE 7-05` | ASCE 7-05 ELF seismic — EX, EY, EXS, EYS (IBC 2006 / 2009 / 2012, BNBC 2020) |
 | `Load Pattern Definitions - Auto Wind - ASCE 7-05` | ASCE 7-05 wind |
 
 ---
 
-## Auto Seismic — ASCE 7-05 (IBC 2012)
+## Auto Seismic — ASCE 7-05
 
-### Full Field List
+### Full Field List (ETABS 23.2.0 — verified)
 
 ```
 Name, IsAuto, XDir, XDirPlusE, XDirMinusE,
@@ -37,99 +37,92 @@ SsAndS1From, Ss, S1, TL, SiteClass, Fa, Fv,
 SDS, SD1, R, Omega, Cd, I
 ```
 
-### Key Field Values
+### Key Field Values — VERIFIED from live ETABS 23.2.0 model
 
-| Field | Options / Notes |
-|---|---|
-| `IsAuto` | `"No"` = primary pattern; `"Yes"` = auto-generated ±eccentricity variant |
-| `XDir` / `YDir` | `"Yes"` or `"No"` |
-| `XDirPlusE`, `XDirMinusE` | `"Yes"` to include accidental eccentricity variants |
-| `PeriodType` | `"Program Calculated"` or `"User Defined"` |
-| `CtAndX` | `"0.016; 0.9"` for concrete MRF; `"0.028; 0.8"` for steel MRF |
-| `SsAndS1From` | `"User Defined"` |
-| `SiteClass` | **Always `"F"`** when using custom Fa/Fv |
-| `SDS`, `SD1` | Computed: SDS = 2/3·Fa·Ss, SD1 = 2/3·Fv·S1 |
+| Field | Correct value | Common mistake |
+|---|---|---|
+| `PeriodType` | `"Approximate"` | ~~`"Program Calculated"`~~ ~~`"Prog Calc"`~~ — both break ETABS 23 |
+| `CtAndX` | `"0.016; 0.9"` | ~~`"0.016, 0.9"`~~ (comma) — wrong separator, rejected |
+| `SsAndS1From` | `"User Defined"` | ~~`"UserDefined"`~~ (no space) — rejected |
+| `SiteClass` | `"F"` | Never A–E — ETABS overwrites Fa/Fv |
+| `IsAuto` | `"No"` for primary | `"Yes"` = auto sub-pattern (EX1, EX2 etc.) |
+| `XDirPlusE/MinusE` | Same as `XDir` | Must match XDir on primary rows |
+| `YDirPlusE/MinusE` | Same as `YDir` | Must match YDir on primary rows |
+| `TopStory` | Real story name e.g. `"Top of OHWT"` | Never `"Base"` — zero height = zero base shear |
 
-### Common Structural System Parameters (ASCE 7-05 Table 12.2-1)
-
-| System | R | Ω | Cd |
-|---|---|---|---|
-| Concrete SMF | 8 | 3 | 5.5 |
-| Steel SMF | 8 | 3 | 5.5 |
-| Steel IMF | 4.5 | 3 | 4 |
-| Concrete SW (special) | 6 | 2.5 | 5 |
-| Steel EBF | 8 | 2 | 4 |
-
-### IBC 2012 Standard Seismic Parameters
+### Verified Example — EX and EY exact values from model
 
 ```
-Ss=1.5, S1=0.6, TL=8, Site Class D → Fa=1.0, Fv=1.5
-SDS = 2/3 × 1.0 × 1.5 = 1.00 g
-SD1 = 2/3 × 1.5 × 0.6 = 0.60 g
+EX: XDir=Yes, XDirPlusE=Yes, XDirMinusE=Yes, YDir=No, YDirPlusE=No, YDirMinusE=No
+    TopStory="Top of OHWT", BotStory="Base", PeriodType="Approximate"
+    CtAndX="0.016; 0.9", SsAndS1From="User Defined"
+    Ss=0.5, S1=0.2, TL=4, SiteClass=F, Fa=1.35, Fv=2.7
+    SDS=0.45, SD1=0.36, R=7, Omega=2.5, Cd=5, I=1
+
+EY: YDir=Yes, YDirPlusE=Yes, YDirMinusE=Yes, XDir=No, XDirPlusE=No, XDirMinusE=No
+    (same seismic parameters as EX)
 ```
 
----
-
-## Verified Code — Add Auto Seismic Patterns
+### Verified Code — Add ASCE 7-05 Patterns (safe, preserves all existing rows)
 
 ```python
 TABLE = "Load Pattern Definitions - Auto Seismic - ASCE 7-05"
 
 model.SetModelIsLocked(False)
 
-# Step 1: Add load patterns (type 5 = Quake/Seismic)
-for name in ("IBC_EQX", "IBC_EQY"):
+# Step 1: Add load pattern shells (type 5 = Quake)
+for name in ("EQX", "EQY"):
     t = model.LoadPatterns.GetNameList()
     if name not in list(t[1]):
         model.LoadPatterns.Add(name, 5, 0.0, True)
 
-# Step 2: Read existing seismic table (preserve other patterns)
+# Step 2: Read existing table — use ETABS's own field list (NEVER filter it)
 t = model.DatabaseTables.GetTableForDisplayArray(TABLE, [], "All", 0, [], 0, [])
 fields = [f for f in list(t[2]) if f is not None]
 n = t[3]; nf = len(fields); flat = list(t[4])
 rows = [{fields[j]: flat[i*nf+j] for j in range(nf)} for i in range(n)]
 
-# Step 3: Remove old versions to avoid duplicates
-rows = [r for r in rows if r["Name"] not in ("IBC_EQX", "IBC_EQY")]
+# Step 3: Remove only EQX/EQY (preserve EX, EY, EXS, EYS and all others)
+rows = [r for r in rows if r["Name"] not in ("EQX", "EQY")]
 
-# Step 4: Build new rows
-def seismic_row(name, x_dir, y_dir,
-                top="Story4", bot="Base",
-                Ss="1.5", S1="0.6", TL="8",
-                Fa="1", Fv="1.5", SDS="1", SD1="0.6",
-                R="8", Omega="3", Cd="5.5", I="1",
-                Ct="0.016", x="0.9", ecc="0.05"):
+# Step 4: Build new rows — start from blank dict with all fields
+def make_row(name, x_dir,
+             top="Top of OHWT", bot="Base",
+             Ss=0.5, S1=0.2, TL=4, Fa=1.35, Fv=2.7,
+             SDS=0.45, SD1=0.36, R=7, Omega=2.5, Cd=5, I=1, ecc=0.05):
     yes = lambda v: "Yes" if v else "No"
-    return {
-        "Name": name, "IsAuto": "No",
-        "XDir": yes(x_dir), "XDirPlusE": yes(x_dir), "XDirMinusE": yes(x_dir),
-        "YDir": yes(y_dir), "YDirPlusE": yes(y_dir), "YDirMinusE": yes(y_dir),
-        "EccRatio": ecc,
-        "TopStory": top, "BotStory": bot,
-        "PeriodType": "Program Calculated",
-        "CtAndX": f"{Ct}; {x}",
-        "SsAndS1From": "User Defined",
-        "Ss": Ss, "S1": S1, "TL": TL,
-        "SiteClass": "F",   # ALWAYS "F" to preserve Fa/Fv
-        "Fa": Fa, "Fv": Fv,
-        "SDS": SDS, "SD1": SD1,
-        "R": R, "Omega": Omega, "Cd": Cd, "I": I,
-    }
+    r = {f: "" for f in fields}   # blank base — preserves any unknown fields
+    r.update({
+        "Name":         name,
+        "IsAuto":       "No",
+        "XDir":         yes(x_dir),
+        "XDirPlusE":    yes(x_dir),
+        "XDirMinusE":   yes(x_dir),
+        "YDir":         yes(not x_dir),
+        "YDirPlusE":    yes(not x_dir),
+        "YDirMinusE":   yes(not x_dir),
+        "EccRatio":     str(ecc),
+        "TopStory":     top,
+        "BotStory":     bot,
+        "PeriodType":   "Approximate",          # VERIFIED: not "Program Calculated"
+        "CtAndX":       "0.016; 0.9",           # VERIFIED: semicolon, not comma
+        "SsAndS1From":  "User Defined",         # VERIFIED: space required
+        "Ss":  str(Ss),  "S1": str(S1), "TL": str(TL),
+        "SiteClass": "F",                       # ALWAYS "F"
+        "Fa":  str(Fa),  "Fv": str(Fv),
+        "SDS": str(SDS), "SD1": str(SD1),
+        "R":   str(R),   "Omega": str(Omega), "Cd": str(Cd), "I": str(I),
+    })
+    return r
 
-rows.append(seismic_row("IBC_EQX", x_dir=True,  y_dir=False))
-rows.append(seismic_row("IBC_EQY", x_dir=False, y_dir=True))
+rows.append(make_row("EQX", x_dir=True))
+rows.append(make_row("EQY", x_dir=False))
 
-# Step 5: Write back
-flat_out = tuple(r.get(f) for r in rows for f in fields)
+# Step 5: Write back using ETABS's own field list
+flat_out = tuple(r.get(f, "") for r in rows for f in fields)
 ret_s = model.DatabaseTables.SetTableForEditingArray(TABLE, 0, fields, len(rows), flat_out)
 ret_a = model.DatabaseTables.ApplyEditedTables(True)
-
-result = {
-    "staged": ret_s[0],        # 1 = OK
-    "errors": ret_a[0],        # 0 = no errors
-    "warnings": ret_a[1],
-    "messages": list(ret_a[2]) if ret_a[2] else [],
-}
+result = {"staged": ret_s[0], "errors": ret_a[0], "warnings": ret_a[1]}
 # Expected: staged=1, errors=0, warnings=0
 ```
 
@@ -137,8 +130,7 @@ result = {
 
 ```python
 t = model.DatabaseTables.GetTableForDisplayArray(
-    "Load Pattern Definitions - Auto Seismic - ASCE 7-05", [], "All", 0, [], 0, []
-)
+    "Load Pattern Definitions - Auto Seismic - ASCE 7-05", [], "All", 0, [], 0, [])
 fields = [f for f in list(t[2]) if f is not None]
 n = t[3]; nf = len(fields); flat = list(t[4])
 rows = [{fields[j]: flat[i*nf+j] for j in range(nf)} for i in range(n)]
@@ -147,11 +139,18 @@ result = [r for r in rows if r.get("IsAuto") == "No"]  # primary patterns only
 
 ---
 
-## BNBC 2020 — Use Dedicated Skill
+## SetASCE716 COM Bug — TopStory=BotStory="Base"
 
-For BNBC 2020, read skill `bnbc2020-seismic-params` — it uses the same
-`"Load Pattern Definitions - Auto Seismic - ASCE 7-05"` table with BNBC-specific
-Ss/S1/Fa/Fv values. The RS function also uses `SiteClass="F"` for same reason.
+`model.AutoSeismic.SetASCE716(...)` accepts the call but always writes `TopStory=BotStory="Base"`.
+Zero story height → zero base shear → scale factor = 0 → RS cases scale to zero → all members overstress in design.
+**Fix:** After any COM seismic call, always read back the table and verify TopStory is a real story name. Better: skip COM entirely and use DatabaseTables only.
+
+---
+
+## BNBC 2020
+
+Uses the same `"Load Pattern Definitions - Auto Seismic - ASCE 7-05"` table with BNBC-specific Ss/S1/Fa/Fv values.
+Read skill `bnbc2020-seismic-params` for the parameter values.
 
 ---
 
@@ -165,7 +164,7 @@ e1, e2, WindSpeed, ExpType, Importance, kzt, GustFact, Kd,
 WidthType, Angle, Story, Diaphragm, Width, Depth, X, Y
 ```
 
-### Add Wind Pattern (Example)
+### Add Wind Pattern
 
 ```python
 WIND_TABLE = "Load Pattern Definitions - Auto Wind - ASCE 7-05"
@@ -183,25 +182,23 @@ rows = [{fields[j]: flat[i*nf+j] for j in range(nf)} for i in range(n)]
 rows = [r for r in rows if r["Name"] not in ("WX", "WY")]
 
 def wind_row(name, angle):
-    return {
+    r = {f: "" for f in fields}
+    r.update({
         "Name": name, "IsAuto": "No",
         "Exposure": "Windward + Leeward",
         "TopStory": "Story4", "BotStory": "Base",
         "Parapet": "0", "UserCp": "No",
         "ASCECase": "1", "e1": "0.15", "e2": "0.15",
-        "WindSpeed": "115",       # mph
-        "ExpType": "B",           # Exposure category
-        "Importance": "1",        # Importance factor
-        "kzt": "1", "GustFact": "0.85", "Kd": "0.85",
+        "WindSpeed": "115", "ExpType": "B",
+        "Importance": "1", "kzt": "1", "GustFact": "0.85", "Kd": "0.85",
         "WidthType": "User", "Angle": str(angle),
-        "Story": None, "Diaphragm": None,
-        "Width": None, "Depth": None, "X": None, "Y": None,
-    }
+    })
+    return r
 
 rows.append(wind_row("WX", 0))
 rows.append(wind_row("WY", 90))
 
-flat_out = tuple(r.get(f) for r in rows for f in fields)
+flat_out = tuple(r.get(f, "") for r in rows for f in fields)
 ret_s = model.DatabaseTables.SetTableForEditingArray(WIND_TABLE, 0, fields, len(rows), flat_out)
 ret_a = model.DatabaseTables.ApplyEditedTables(True)
 result = {"errors": ret_a[0], "warnings": ret_a[1]}
@@ -211,8 +208,6 @@ result = {"errors": ret_a[0], "warnings": ret_a[1]}
 
 ## Notes
 
-- After `ApplyEditedTables`, ETABS auto-creates the ±eccentricity sub-patterns
-  (e.g. `IBC_EQX1`, `IBC_EQX2`) — these have `IsAuto="Yes"`.
-- `SDS` and `SD1` in the table are informational display values; ETABS recomputes
-  them internally from Ss, S1, Fa, Fv, SiteClass.
-- **Verified on ETABS 23.2.0**, model `IBC2012_Test.EDB`.
+- After `ApplyEditedTables`, ETABS auto-creates ±eccentricity sub-patterns (e.g. `EQX1`, `EQX2`) with `IsAuto="Yes"`.
+- `SDS` and `SD1` in the table are display values — ETABS recomputes them from Ss, S1, Fa, Fv, SiteClass.
+- **Verified on ETABS 23.2.0**, model `D:\Atibazar\etabs2\Ati-N-15.$et`.

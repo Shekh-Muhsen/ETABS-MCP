@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from packaging.version import InvalidVersion, Version
 
-SERVER_VERSION = "1.0.0"
+SERVER_VERSION = "2.0.0"
 MINIMUM_SUPPORTED_VERSION = Version("21.0.0")
 
 
