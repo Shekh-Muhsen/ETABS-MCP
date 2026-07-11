@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.0] - 2026-07-11
+
+### Added — Load Setup & Combination Skills (from plugin source)
+
+Two new workflow skills derived from the `Form1.Tab.LoadSetup.cs` and `Form1.Tab.ComboEditor.cs` plugin tabs:
+
+- **`workflow-load-patterns-cases`** — Idempotent setup of all standard load patterns and cases: gravity SuperDead patterns (PWL, FF), Live patterns (Live_G, Live_W, LLR), seismic ELF auto patterns EX/EY (ASCE 7-05), wind auto patterns WX/WY (ASCE 7-05), composite cases DL (all Dead+SuperDead) and LLA (all Live), RS function (ASCE 7-05 design spectrum from SDS/SD1/TL), RS cases Spec X / Spec Y, modal Eigen case, and Ev = 0.2·SDS × all Dead patterns. Only creates items not already present.
+- **`workflow-load-combinations`** — Full ASCE 7-05 / BNBC 2020 combination library (68 combos) with role mapping (D→DL, L→LLA, Lr→LLR, Ex→EX, Ey→EY, Ev→Ev, Wx→WX, Wy→WY, Sx→Spec X, Sy→Spec Y): SLS gravity (3 combos), SLS wind (8 combos), SLS seismic ELF ±Ev (24 combos), ULS gravity (2), ULS wind (8), ULS seismic RS 100%+30% ±Ev (16), ULS seismic ELF 100%+30% ±Ev (16). Includes helpers for reading, editing, and bulk-adding cases to combos via `RespCombo` API.
+
+### Changed
+- Version bumped to 2.1.0.
+- README skill table updated with v2.1 load setup section.
+
+---
+
 ## [2.0.0] - 2026-07-11
 
 ### Added — Code Check Workflow Skills (from plugin source)

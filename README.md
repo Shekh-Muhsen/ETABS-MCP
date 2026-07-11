@@ -1,6 +1,6 @@
 # ETABS MCP Server
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue)
+![Version](https://img.shields.io/badge/version-2.1.0-blue)
 ![ETABS](https://img.shields.io/badge/ETABS-21%2B-orange)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -63,6 +63,13 @@ Claude translates your request into ETABS COM API calls automatically — no scr
 | `workflow-modifiers` | Frame and area stiffness modifier review and assignment |
 | `etabs-database-tables` | Complete guide to all 165 database tables with field schemas |
 | `etabs-errors` | Troubleshooting guide — ret codes, locked model, COM issues |
+
+### New in v2.1 — Load Setup & Combination Skills (from plugin source)
+
+| Skill | What it does |
+|-------|-------------|
+| `workflow-load-patterns-cases` | Create gravity (SuperDead/Live), seismic ELF (ASCE 7-05 auto), and wind patterns; composite DL/LLA cases; Ev = 0.2·SDS×Dead; modal and RS cases — idempotent, only creates what is missing |
+| `workflow-load-combinations` | Full ASCE 7-05 / BNBC 2020 combo library (68 combos): SLS gravity/wind/seismic, ULS gravity/wind, ULS seismic RS and ELF (100%+30% ±Ev) with role mapping D/L/Lr/Ex/Ey/Wx/Wy/Sx/Sy/Ev |
 
 ### New in v2.0 — Code Check Workflow Skills (from plugin source)
 
